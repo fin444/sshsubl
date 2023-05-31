@@ -1,0 +1,34 @@
+#! /bin/bash
+
+if [[ $# -ne 2 ]]; then
+	echo "Wrong number of arguments"
+	exit 1
+fi
+
+if [[ "${2:0:1}" != "/" ]]; then
+	echo "File does not start with /"
+	exit
+fi
+
+RFILE="$1:$2"
+LFILE="/tmp/sshsubl/$1$2"
+
+mkdir -p `echo $LFILE | sed -r 's/\/[^\/]+$//'`
+ssh $1 touch $2
+scp $RFILE $LFILE > /dev/null
+
+function saveloop {
+	while [[ true ]]; do
+		if inotifywait -q $LFILE | grep -q "MODIFY"; then
+			scp $LFILE $RFILE > /dev/null
+		fi
+	done
+}
+
+saveloop &
+
+subl -w $LFILE
+pkill -P $$
+
+rm $LFILE
+find /tmp/sshsubl -type d -empty -delete
